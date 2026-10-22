@@ -1,0 +1,694 @@
+/* ============================================================================
+   中文课 7.0 · 横屏版 —— 布局层
+   ----------------------------------------------------------------------------
+   skin.css 原样来自 7.0：两个主题、三套配色、所有组件的皮都在那儿。
+   这一份只回答一个问题：手机横过来以后，东西放哪儿。基本不碰颜色。
+
+   每一块教室屏都是同一个构图：
+     ┌──────────────────────────────────────────────────────┐
+     │ ◖  ┌ 顶排胶囊 ─────────────────────┐                  │
+     │ ◖  │                              │     老师          │
+     │ ◖  │  黑板：写字区                 │  （站在板的右端）   │
+     │    └──────────────────────────────┘                  │
+     │      字幕 / 老师的话（地面左）         拇指区（右下）     │
+     └──────────────────────────────────────────────────────┘
+   用 CSS grid 排：两列 [写字区 | 她]，四行 [顶排 | 进度 | 主体 | 地面]。
+   黑板（.dh::before）、粉笔槽（.dh::after）和她（.dh-art）都是绝对定位，
+   但都给了 grid-row / grid-column —— 绝对定位元素的包含块会变成那块网格区域，
+   于是板的下沿自动停在「地面」那一行上面：字幕多一行，板就跟着矮一截，
+   不用再像竖版那样给每块屏手算 --board-bottom。
+
+   特异度：skin.css 里多巴胺主题的规则都写成 [data-theme="pop"] .xxx。
+   这里凡是可能和它打架的选择器都写成 [data-theme] .xxx —— 特异度相同、出场更晚，
+   所以赢；冷调（data-theme="cool"）也一样命中。
+   ========================================================================== */
+
+/* ───────── 设备：900×420 的手机框，灵动岛在左 ───────── */
+:root{--stageh:404px}
+.shell{max-width:1000px}
+.device{width:900px;height:420px;
+  /* 安全区。手机逆时针转过来，灵动岛在左边；右边只有圆角。 */
+  --sl:46px;--sr:18px;--st:10px;--sb:10px;
+  --rail-w:62px;
+  /* 她那一列：屏宽的三分之一，夹在 196–300px 之间 */
+  --herw:clamp(196px,33%,300px)}
+.device::before{top:50%;left:10px;transform:translateY(-50%);
+  width:28px;height:116px;border-radius:0 18px 18px 0}
+
+/* iOS 横屏不显示状态栏。手机框里直接拿掉。
+   铺满视图下那几颗原型开关（主题 / 配色 / 手机框）只在有导航条的三个 tab 页出现，
+   竖着收进导航条上方那块空墙——放在顶上居中会压住课堂顶排的胶囊。 */
+.statusbar{display:none}
+html.bleed .device:has(#tabbar:not(.hide)) .statusbar{display:flex;position:absolute;z-index:45;
+  top:var(--st);left:var(--sl);width:var(--rail-w);height:auto;padding:0;justify-content:center}
+html.bleed #clock,html.bleed .status-icons{display:none}
+html.bleed .statusmid{flex-direction:column;gap:5px;padding:5px 4px;border-radius:16px;background:rgba(14,16,30,.42);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+html.bleed .statusmid .viewbtn{margin:0;padding:3px 7px;opacity:.9;color:#fff;background:rgba(255,255,255,.16)}
+html[data-theme="pop"].bleed .statusmid{background:rgba(255,255,255,.78);box-shadow:0 3px 0 rgba(var(--shk),.1)}
+html[data-theme="pop"].bleed .statusmid .viewbtn{color:var(--ink);background:rgba(var(--shk),.08)}
+html.bleed .palsw.mini{gap:3px}
+
+[data-theme] .screen,[data-theme] .t-screen{inset:0}
+html.bleed .screen,html.bleed .t-screen{inset:0}
+
+/* 铺满：整块视口就是屏幕 */
+html.bleed{--stageh:100dvh}
+html.bleed .device{width:100%;max-width:none;height:100dvh;
+  --sl:max(env(safe-area-inset-left),14px);--sr:max(env(safe-area-inset-right),14px);
+  --st:max(env(safe-area-inset-top),8px);--sb:max(env(safe-area-inset-bottom),8px)}
+
+/* 竖着拿：请人转过来（只在铺满视图里出现） */
+.rotate{display:none}
+@media (orientation:portrait){
+  html.bleed .rotate{display:flex;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;
+    padding:28px;background:var(--bg);color:var(--ink);text-align:center}
+}
+.rotate-in{max-width:300px}
+.rotate-in h2{font-size:21px;font-weight:850;margin:22px 0 8px;letter-spacing:.01em}
+.rotate-in p{font-size:13px;line-height:1.65;color:var(--muted);font-weight:600;margin:0 0 20px}
+.rotate-act{display:flex;flex-direction:column;gap:9px;align-items:center}
+.rotate-act .gbtn{justify-content:center;min-width:190px}
+.rotate-ph{width:46px;height:78px;margin:0 auto;border-radius:12px;border:3px solid var(--violet);position:relative;
+  animation:rotPh 2.6s var(--ease) infinite}
+.rotate-ph i{position:absolute;left:50%;top:6px;width:14px;height:4px;margin-left:-7px;border-radius:2px;background:var(--violet)}
+@keyframes rotPh{0%,18%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(-90deg)}}
+
+/* ───────── 左侧竖向导航条 ─────────
+   竖版那颗横胶囊竖过来贴在左边：横屏宽度富余、高度紧，导航放侧边不占高度。
+   当前项从圆钮展开成「图标 + 字」的竖胶囊。 */
+[data-theme] .tabbar{left:var(--sl);top:50%;bottom:auto;transform:translateY(-50%);
+  width:var(--rail-w);height:auto;padding:9px 0;border-radius:31px;flex-direction:column;gap:9px}
+[data-theme] .tabbar.hide{transform:translate(-14px,-50%)}
+[data-theme] .tab.on{width:50px;height:58px;border-radius:19px;flex-direction:column;gap:3px;
+  font-size:10.5px;letter-spacing:.02em}
+[data-theme] .tab.on svg{width:19px;height:19px}
+
+/* ============================================================================
+   教室：两列四行的网格
+   ========================================================================== */
+[data-theme] :is(.talk,.ask,.lesson,.stage,.tstage){
+  --bl:var(--sl);
+  display:grid;align-content:stretch;
+  /* 她那一列至少 --herw；右下角的按钮簇更宽时（小屏、英文界面）这一列跟着变宽，
+     写字区让出来，而不是按钮簇往左压到字幕上 */
+  grid-template-columns:minmax(0,1fr) minmax(var(--herw),max-content);
+  grid-template-rows:auto auto minmax(0,1fr) auto;
+  column-gap:14px;
+  padding:20px calc(var(--sr) + 10px) var(--sb) calc(var(--bl) + 12px);
+  height:var(--stageh)}
+/* 有导航条的两块屏：板往右让出导航条 */
+[data-theme] :is(.stage.with-tabs,.tstage){--bl:calc(var(--sl) + var(--rail-w) + 10px)}
+[data-theme] .tstage{height:auto}
+
+/* 黑板：从顶排一直到「主体」行的底；四周比网格区域各外扩一圈，正好落在安全区边上 */
+[data-theme] :is(.talk,.ask,.lesson,.stage,.tstage)::before{
+  grid-row:1 / 4;grid-column:1 / -1;top:-10px;left:-12px;right:-10px;bottom:0}
+/* 粉笔槽贴在板下沿 */
+[data-theme] :is(.talk,.ask,.lesson,.stage,.tstage)::after{
+  grid-row:1 / 4;grid-column:1 / -1;top:auto;left:-3px;right:-1px;bottom:-9px}
+[data-theme="pop"] :is(.talk,.ask,.lesson,.stage,.tstage)::after{bottom:-15px}
+
+/* 她：站在板的右端，整个人在板沿以内（亮主题下露到墙上就是一块污渍） */
+[data-theme] :is(.talk,.ask,.lesson,.stage,.tstage) > :is(.dh-art,.dh-wrap){
+  grid-row:1 / 4;grid-column:2;top:-4px;right:-4px;bottom:2px;left:-34px;width:auto;height:auto}
+[data-theme] .room-floor{top:auto;bottom:0;height:24%;z-index:0}   /* 压在板下面：只在墙上露出来，别给板蒙一层雾 */
+[data-theme] .room-shadow{display:none}
+[data-theme] .dh-state{top:20px;right:calc(var(--sr) + 14px)}
+
+/* 竖版里这些字浮在板外的墙上（亮主题下是深字）；横版顶排压在板上，一律换回粉笔色 */
+[data-theme] :is(.talk-step,.lesson .lh-t span){color:var(--chalk-soft)}
+[data-theme] .lesson .lh-t{color:var(--chalk)}
+[data-theme] .lesson .lh-min{color:var(--chalk-violet)}
+[data-theme] :is(.talk-bar i:not(.on),.dots i:not(.on),.lh-bar i:not(.on):not(.now)){background:rgba(255,255,255,.2)}
+
+/* 地面那一行：字幕 / 老师的话在左，拇指区在右。上边留出粉笔槽的位置。 */
+[data-theme] :is(.talk-cap,.cap){margin:22px 0 0}
+
+/* ───────── 拇指区（右下角） ─────────
+   主按钮缩成一颗短键帽，次按钮变小胶囊，排成一行贴右下角。
+   DOM 里的先后不一，统一用 order 排：次要的在左，主按钮永远在最右、拇指底下。 */
+.thumb[hidden]{display:none}
+[data-theme] :is(.thumb,.cls-act,.stage-act){display:flex;flex-direction:row;align-items:center;justify-content:flex-end;
+  flex-wrap:nowrap;gap:8px;padding:0;margin:0}
+[data-theme] .thumb{grid-row:4;grid-column:2;justify-self:end;align-self:end;margin-top:22px;position:relative;z-index:7}
+[data-theme] :is(.thumb,.cls-act,.stage-act) .btn{width:auto;flex:none;min-width:116px;max-width:230px;height:48px;
+  padding:0 20px;font-size:15px;line-height:1.2;white-space:normal;text-align:center;order:9}
+[data-theme] :is(.thumb,.cls-act,.stage-act) .btn.light,
+[data-theme] :is(.thumb,.cls-act,.stage-act) .btn.ghost{min-width:0;height:42px;padding:0 15px;font-size:13px;order:3}
+[data-theme] :is(.thumb,.cls-act,.stage-act) .tbtn{width:auto!important;flex:none;height:40px;padding:0 13px;margin:0!important;
+  border-radius:999px;font-size:12.5px;white-space:nowrap;order:1;
+  background:var(--glass);border:1px solid var(--glass-line);color:#fff;
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);box-shadow:var(--glass-shadow)}
+[data-theme="pop"] :is(.thumb,.cls-act,.stage-act) .tbtn{background:#fff;border:0;color:var(--c1d);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  box-shadow:0 4px 0 rgba(var(--shk),.12),0 9px 16px rgba(var(--shw),.18)}
+[data-theme="pop"] :is(.thumb,.cls-act,.stage-act) .tbtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(var(--shk),.12)}
+[data-theme] .thumb .btn svg{width:16px;height:16px}
+/* 「听一遍」这类次按钮：冷调走玻璃，亮主题走白键帽 + 主色字（竖版里是绿玻璃配橙字，压在她身上看不清） */
+[data-theme] .thumb .btn.light{background:var(--glass);border:1px solid var(--glass-line);color:#fff;
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);box-shadow:var(--glass-shadow)}
+[data-theme="pop"] .thumb .btn.light{background:linear-gradient(180deg,#fff,var(--bg-2));border:0;color:var(--c1d);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  box-shadow:0 5px 0 var(--key-neutral-side),0 10px 18px rgba(var(--shw),.16),inset 0 2px 0 #fff}
+[data-theme="pop"] .thumb .btn.light:active{transform:translateY(4px);box-shadow:0 1px 0 var(--key-neutral-side),inset 0 2px 0 #fff}
+
+/* 跟读：麦克风从 96px 的大圆缩成拇指底下的一颗 64px */
+[data-theme] .thumb .mic{width:64px;height:64px;margin:0;order:6;flex:none}
+[data-theme] .thumb .mic svg{width:24px;height:24px}
+[data-theme] .thumb .mic.rec{box-shadow:0 0 0 9px rgba(238,122,52,.2)}
+[data-theme] .thumb .mic-cap{order:5;margin:0;max-width:118px;text-align:right;font-size:11px;line-height:1.35;
+  color:var(--chalk-soft)}
+[data-theme="pop"] .thumb .mic-cap{color:var(--chalk-soft)}
+
+/* ============================================================================
+   讲解（.talk）
+   ========================================================================== */
+[data-theme] .talk{grid-template-rows:auto auto minmax(0,1fr) auto}
+[data-theme] .talk-top{grid-row:1;grid-column:1;padding:0}
+[data-theme] .talk-bar{grid-row:2;grid-column:1;margin:9px 2px 0}
+[data-theme] .talk .board-wrap{grid-row:3;grid-column:1;height:auto;min-height:0;margin:0;padding-top:0}
+[data-theme] .talk-cap{grid-row:4;grid-column:1;align-self:end;padding:10px 15px}
+[data-theme] .talk-say{font-size:15px}
+[data-theme] .talk-en{margin-top:3px}
+/* 四个控制钮：从铺满一行的长条缩成四颗方键，挤在她脚下 */
+[data-theme] .talk-ctl{grid-row:4;grid-column:2;justify-self:end;align-self:end;margin-top:22px;padding:0;gap:6px}
+[data-theme] .talk-ctl button{flex:none;width:58px;height:54px;border-radius:16px;padding:6px 2px 5px;
+  font-size:9.5px;gap:2px;align-content:center}
+/* 板书：竖版要让开站在右边的她（padding-right:44%）；横版写字区本来就在她左边 */
+[data-theme] .bd{padding:6px 4px 10px 4px}
+[data-theme] .bd-say{right:2px;top:2px}
+/* 三组词并排写，比竖着摞三层省一半高度 */
+[data-theme] .bd-groups{flex-direction:row;flex-wrap:wrap;gap:12px 14px;align-items:flex-start}
+[data-theme] .bd-group{flex:1 1 104px;min-width:0}
+[data-theme] .bd-z{font-size:clamp(26px,4.4vw,36px)}
+
+/* 段末一问：贴在板中间的一张白纸；纸后面那块旧板书先藏起来，她和字幕都还在 */
+[data-theme] .talk.has-chk .board-wrap{visibility:hidden}
+[data-theme] .chk{grid-row:3;grid-column:1;z-index:8;align-self:center;max-height:100%;overflow-y:auto;scrollbar-width:none;
+  margin:2px 0 0;padding:14px 16px 14px;border-radius:var(--r-xl);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:max-content;gap:8px;align-content:start}
+/* 只有两个选项的段末一问（「前面 / 后面」）：两列 */
+[data-theme] .chk:has(> .qopt:nth-of-type(2):last-of-type){grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-theme] .chk::-webkit-scrollbar{display:none}
+[data-theme] .chk > :is(.chk-k,.chk-q,.fb){grid-column:1 / -1}
+[data-theme] .chk-k{margin-bottom:0}
+[data-theme] .chk-q{margin:0 0 4px;font-size:15px}
+[data-theme] .chk .qopt{margin:0;height:100%;align-items:flex-start;gap:8px;padding:10px 11px;font-size:13.5px;line-height:1.4}
+[data-theme] .chk .fb{margin-top:2px}
+/* 答完以后没选的那项：原来整块压成半透明，编号「3」只剩 0.23 的亮度差（检测器量出来的）。改成不透明、用浅字 */
+[data-theme] .chk .qopt.dim{opacity:1;color:var(--faint)}
+[data-theme] .chk .qopt.dim .k{color:var(--muted)}
+
+/* 讲完了、没有段末一问：控制条被收进拇指区，「暂停」「说慢点」已经没意义，收掉；剩下两颗排在「继续」左边 */
+[data-theme] .thumb > .talk-ctl{order:1;margin:0;padding:0}
+[data-theme] .thumb > .talk-ctl :is(#tkPause,#tkSlow){display:none}
+
+/* ============================================================================
+   分级面谈（.ask）：问题写在板上，选项是贴在板上的卡，摆成两三列
+   ========================================================================== */
+[data-theme] .ask{grid-template-rows:auto auto minmax(0,1fr) auto;padding-top:16px}
+[data-theme] .ask::before{top:-6px}
+[data-theme] .ask::before,[data-theme] .ask::after,
+[data-theme] .ask > :is(.dh-art,.dh-wrap){grid-row:1 / 4}
+[data-theme] .ask .cls-top{position:relative;left:auto;right:auto;top:auto;grid-row:1;grid-column:1}
+[data-theme] .ask .gpill{max-width:none}
+/* 六段进度条不另占一行：塞进顶排两颗胶囊中间 */
+[data-theme] .ask .dots{grid-row:1;grid-column:1;align-self:center;justify-self:center;width:44%;margin:0;z-index:6}
+[data-theme] .ask-slate{grid-row:2;grid-column:1;margin:0}
+[data-theme] .ask-slate .slate-in{padding:10px 4px 2px}
+[data-theme] .ask-slate .chalk-k{margin-bottom:6px}
+[data-theme] .ask-slate .chalk-h{font-size:22px;line-height:1.35}
+[data-theme] .ask-slate .chalk-s{margin-top:3px}
+/* 选项默认只往她身前伸 60px——她的脸从站位框左起约三分之一处才开始，60px 只压到她肩膀的虚化边。
+   只有第 1 问六个选项要更宽：它的题目两行高，选项落在她下巴以下，可以伸到胸口。
+   （这两个数是 check-layout.js 按立绘真实渲染位置在四种尺寸下量出来的） */
+[data-theme] .ask-body{grid-row:3;grid-column:1 / -1;margin-right:calc(var(--herw) - 60px);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:max-content;gap:8px;align-content:start;
+  padding:9px 2px 6px}
+[data-theme] .ask-body:has(> .opt:nth-of-type(6)){margin-right:calc(var(--herw) * .42)}
+[data-theme] .ask-body:has(> .opt:nth-of-type(4):last-of-type){grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-theme] .ask-body > :is(.audio,.glyphs,.note,.verdict){grid-column:1 / -1}
+[data-theme] .ask-body .opt{margin:0;padding:9px 11px;gap:9px;align-items:flex-start;position:relative}
+/* 「HSK 4」标签挪到卡片右上角，描述拿到整行宽度——中文描述从两行变一行，英文从三行变两行 */
+[data-theme] .ask-body .opt-x{position:absolute;top:10px;right:11px;font-size:11px}
+[data-theme] .ask-body .opt:has(.opt-x) .opt-t{padding-right:40px}
+[data-theme] .ask-body .opt-t{font-size:13.5px}
+[data-theme] .ask-body .opt-d{font-size:11px;margin-top:2px}
+[data-theme] .ask-body .opt-k{width:23px;height:23px;border-radius:8px;font-size:11px}
+[data-theme] .ask-body .audio{margin:0}
+[data-theme] .ask-body .glyphs{grid-template-columns:repeat(8,minmax(0,1fr));margin:0}
+[data-theme] .ask-body .note.light{margin:2px 0 0}
+[data-theme] .ask .cap{grid-row:4;grid-column:1;align-self:end;margin:22px 0 0;padding:9px 15px}
+[data-theme] .ask .cap p{font-size:14px;line-height:1.5}
+[data-theme] .ask .cls-act{grid-row:4;grid-column:2;justify-self:end;align-self:end;margin-top:22px;flex-direction:row}
+[data-theme] .ask .cls-row{display:flex;flex-direction:column;gap:6px;order:1}
+[data-theme] .ask .cls-row .tbtn{height:32px;font-size:12px}
+
+/* 判定屏：结论照竖版那样三行写在板上（只收紧行距）——这样理由纸从她下巴以下才开始，
+   可以放心往她身前伸、伸到胸口；要是把结论压成一行，纸就上移到她脸的高度，屏一高就把脸盖住。
+   理由纸分两栏：左边三条理由，右边 2×2 的课表口径 + 考试提醒 */
+[data-theme] .ask:has(.verdict) .ask-slate .slate-in{padding-top:8px}
+[data-theme] .ask:has(.verdict) .ask-slate .chalk-k{margin-bottom:3px}
+[data-theme] .ask:has(.verdict) .ask-slate .chalk-s{margin-top:1px}
+[data-theme] .ask .chalk-h.lv{font-size:26px;margin-right:0;line-height:1.22}
+[data-theme] .ask-body .verdict{margin:0}
+[data-theme] .ask-body .v-body{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-auto-rows:max-content;
+  column-gap:16px;padding:10px 14px}
+[data-theme] .ask-body .v-why{grid-column:1;font-size:12px;line-height:1.5;padding:4px 0}
+[data-theme] .ask-body :is(.v-plan,.v-exam){grid-column:2}
+[data-theme] .ask-body .v-plan{grid-row:1 / span 2;margin:4px 0 8px;padding:8px 10px;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;align-self:start}
+[data-theme] .ask-body .v-plan-r{flex-direction:column;gap:1px;font-size:12px;padding:0}
+[data-theme] .ask-body .v-plan-r span{font-size:10.5px}
+[data-theme] .ask-body .v-exam{grid-row:3 / span 2;align-self:start;font-size:12px;line-height:1.55;padding:8px 11px}
+/* 理由纸可以比选项再往她身前多伸一截（只到胸口，脸在纸上面）。脸遮挡由 check-layout.js 在 884×404 / 667×375 / 932×430 上量过 */
+[data-theme] .ask-body:has(.verdict){overflow-y:auto;margin-right:calc(var(--herw) * .16)}
+
+/* 7.0 带过来的一处：多巴胺主题里面谈选项按位置轮色（nth-child）写在 .opt.sel 后面、特异度相同，
+   于是选中态的主色底被浅色底盖掉，只剩白字——第 6 问默认选中的「25 分钟」几乎看不见。这里把选中态提一级。 */
+[data-theme="pop"] .opt.sel:nth-child(n){background:var(--c1);box-shadow:0 5px 0 var(--c1d),0 12px 22px rgba(var(--sh1),.34)}
+
+/* ============================================================================
+   全屏课堂：今天、面谈开场（.stage）
+   板上写今天这节课；她的话落在板下面的墙上，「上课」在她脚下
+   ========================================================================== */
+[data-theme] .stage{grid-template-rows:minmax(0,1fr) auto auto auto auto;justify-content:normal}
+[data-theme] .stage::before,[data-theme] .stage::after,
+[data-theme] .stage > :is(.dh-art,.dh-wrap){grid-row:1 / 3}
+[data-theme] .stage .today-slate{position:relative;left:auto;right:auto;top:auto;grid-row:1;grid-column:1;align-self:center}
+[data-theme] .stage .slate-in{padding:4px 4px 6px}
+[data-theme] .stage-in{display:contents}
+[data-theme] .stage-chip{grid-row:2;grid-column:1;justify-self:start;margin:0 0 4px;position:relative;z-index:6}
+[data-theme] .stage-who{grid-row:3;grid-column:1;margin:22px 0 5px;position:relative;z-index:6}
+[data-theme] .stage-say{grid-row:4;grid-column:1;font-size:16.5px;line-height:1.55;position:relative;z-index:6}
+[data-theme] .stage-en{grid-row:5;grid-column:1;margin:4px 0 0;position:relative;z-index:6}
+[data-theme] .stage-act{grid-row:3 / 6;grid-column:2;justify-self:end;align-self:end;margin:0;position:relative;z-index:6}
+/* 「上滑看课程介绍」不再单占一行：贴在屏底正中，压在粉笔槽下面那条缝里 */
+[data-theme] .stage-hint{position:absolute;left:50%;bottom:0;transform:translateX(-50%);padding:0;z-index:6;
+  font-size:10.5px;white-space:nowrap}
+[data-theme] .stage-hint svg{width:12px;height:12px}
+/* 竖版的压暗罩是为了托住屏底的白字；横版的字落在墙上，不需要 */
+[data-theme] .stage-in{background:none}
+[data-theme] .stage .chalk-words{margin-top:12px;gap:6px}
+[data-theme] .stage .chalk-words span{padding:6px 8px 5px;min-width:42px}
+[data-theme] .stage .chalk-h{font-size:24px;line-height:1.4}
+
+/* 今天页往上滑：课程介绍变成两栏。不再往上压住课堂（竖版那 26px 是为了露出一道「还有」的边）。
+   用多栏而不是网格：左栏是那张长长的课时卡，右栏是剧场入口和街区动态，两栏各自往下长，互不牵扯行高。 */
+[data-theme] .today-body{columns:2;column-gap:14px;
+  margin-top:0;padding:18px calc(var(--sr) + 8px) 26px calc(var(--sl) + var(--rail-w) + 14px)}
+[data-theme] .today-body > *{break-inside:avoid}
+[data-theme] .today-body > :is(.grab,.note){column-span:all}
+[data-theme] .today-body > .lesson-card + .gate{break-before:column}
+[data-theme] .today-body .wordstrip{flex-wrap:wrap;overflow:visible}
+[data-theme] .today-body .steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+[data-theme] .today-body .srow{padding:9px 9px;gap:7px;font-size:13px}
+/* 卡片里的按钮也不铺满：缩成右对齐的短键帽 */
+[data-theme] .today-body :is(.lesson-card,.gate,.pref-card) > .btn{width:auto;min-width:150px;margin-left:auto;padding:13px 24px}
+[data-theme] .today-body .lesson-card > .btn{display:flex}
+
+/* ============================================================================
+   课时练习（.lesson）：板一直铺到底，拇指区压在她的下半身上
+   ========================================================================== */
+[data-theme] .lesson{grid-template-rows:auto minmax(0,1fr) auto;padding-bottom:calc(var(--sb) + 22px)}
+[data-theme] .lesson::before,[data-theme] .lesson > :is(.dh-art,.dh-wrap){grid-row:1 / -1}
+[data-theme] .lesson::before{bottom:-12px}
+[data-theme] .lesson::after{grid-row:1 / -1;bottom:-21px}
+[data-theme="pop"] .lesson::after{bottom:-27px}
+/* 顶排：✕ · 第几课 · 七段进度 · 时长，压成一行 */
+[data-theme] .lesson .lh{grid-row:1;grid-column:1;padding:0;display:flex;align-items:center;gap:10px}
+/* skin.css 里 html.bleed .lh{top:38px} 是给竖版状态栏让位的；横版没有状态栏，不归零的话铺满时整排往下掉 38px */
+html.bleed .lesson .lh{top:auto}
+[data-theme] .lesson .lh-row{display:contents}
+[data-theme] .lesson .lh-x{order:1}
+[data-theme] .lesson .lh-t{order:2;flex:none;max-width:42%}
+[data-theme] .lesson .lh-bar{order:3;flex:1;min-width:60px}
+[data-theme] .lesson .lh-min{order:4;margin-left:0}
+[data-theme] .lesson .lbody{grid-row:2 / 4;grid-column:1;height:auto;padding:12px 2px 6px}
+[data-theme] .lesson .thumb{grid-row:3;grid-column:2;margin-top:12px}
+
+/* 竖版为了让开她，题干 padding-right:44%、选项 margin-right:15–26%；横版写字区本来就在她左边 */
+[data-theme] .lesson :is(.lq-t,.drill-q,.wcard-z,.wcard-p,.wcard-m,.gcard h3,.drill h3,.gcard p,.shp){padding-right:0}
+[data-theme] .lesson :is(.qopt,.fb,.chips,.tfrow,.wcard-eg,.eg,.audio){margin-right:0}
+[data-theme] .lesson :is(.lq,.wcard,.drill,.gcard){padding:2px 0 8px;margin-bottom:4px}
+[data-theme] .lesson .qopt{padding:11px 13px;margin-bottom:7px}
+
+/* 生词：左边整块是这个字，右边是例句 */
+[data-theme] .lesson .wcard{display:grid;grid-template-columns:auto minmax(0,1fr);grid-auto-rows:max-content;column-gap:26px;align-items:start}
+[data-theme] .lesson .wcard > *{grid-column:1}
+[data-theme] .lesson .wcard-pos{justify-self:start}
+[data-theme] .lesson .wcard-eg{grid-column:2;grid-row:1 / span 6;align-self:center;margin-top:0}
+[data-theme] .lesson .wcard-z{font-size:76px}
+[data-theme] .lesson .wdots{margin-bottom:8px}
+
+/* 字形卡：八个字排成两栏 */
+[data-theme] .lesson .lq:has(> .shp){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;column-gap:18px}
+[data-theme] .lesson .lq:has(> .shp) > :not(.shp){grid-column:1 / -1}
+[data-theme] .lesson .shp{padding:9px 0}
+[data-theme] .lesson .shp:nth-last-child(2){border-bottom:0}
+
+/* 声调实验室：四个调一行；三组最容易混的对子排成三栏（每栏：两颗字 + 一句说明） */
+[data-theme] .lesson[data-seg="tonefeet"] .lq:first-child .tfrow{grid-template-columns:repeat(4,minmax(0,1fr))}
+[data-theme] .lesson[data-seg="tonefeet"] .lq:nth-child(2){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-rows:repeat(4,auto);grid-auto-flow:column;column-gap:12px}
+[data-theme] .lesson[data-seg="tonefeet"] .lq:nth-child(2) > .lq-n{grid-column:1 / -1;grid-row:1;justify-self:start}
+[data-theme] .lesson[data-seg="tonefeet"] .lq:nth-child(2) > .note:nth-child(2){grid-column:1 / -1;grid-row:2}
+[data-theme] .lesson .tfrow{margin-right:0}
+
+/* 替换练习 */
+[data-theme] .lesson .drill-q{margin:6px 0 12px}
+[data-theme] .lesson :is(.drill,.lq) .note{text-align:left!important}
+[data-theme] .lesson .lq > div[style*="text-align:center"]{text-align:left!important}
+
+/* 听力与小测：左边听音 + 题干，右边选项 + 反馈。
+   竖着摞的话，答完以后反馈和「让老师讲一下」会掉到折线以下。
+   用多栏而不是网格：两边各自往下长，不共用行高；第一个选项前面强制换栏。 */
+[data-theme] .lesson .lq:has(> .qopt){columns:2;column-gap:22px}
+[data-theme] .lesson .lq:has(> .qopt) > *{break-inside:avoid}
+[data-theme] .lesson .lq:has(> .qopt) > .qopt:first-of-type{break-before:column}
+[data-theme] .lesson .lq:has(> .qopt) .lq-t{margin-bottom:10px}
+[data-theme] .lesson .lq:has(> .qopt) .audio{margin-bottom:12px}
+/* 声调实验室和段末小结里的选项本来就短，不分栏 */
+[data-theme] .lesson[data-seg="tonefeet"] .lq:has(> .qopt){columns:auto}
+[data-theme] .lesson[data-seg="tonefeet"] .lq:has(> .qopt) > .qopt:first-of-type{break-before:auto}
+
+/* 5.0 留下来的几处行内颜色（拼音用 --violet、英文和「老师问你」用 --muted），
+   竖版里也是压在板上的，亮主题下是棕字配绿底、冷调下是紫字配深底，几乎看不见。
+   不动 JS，这里按属性把它们换回粉笔色。 */
+[data-theme] .lesson .lq > p[style*="--muted"]{color:var(--chalk-soft)!important}
+[data-theme] .lesson .lq > p[style*="--violet"]{color:var(--chalk-violet)!important}
+/* 「听老师读」这类板上的次按钮：亮主题下也走白键帽（原来是绿玻璃配橙字） */
+[data-theme="pop"] .lesson .lq > .btn.light{background:linear-gradient(180deg,#fff,var(--bg-2));border:0;color:var(--c1d);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  box-shadow:0 5px 0 var(--key-neutral-side),0 10px 18px rgba(var(--shw),.16),inset 0 2px 0 #fff}
+[data-theme] .lesson .lq > .btn.light{width:auto;padding:11px 20px}
+
+/* 结课：成绩单是一张纸，左边分数、右边明细（同样用多栏：明细从第一行起排，不跟左边对行） */
+[data-theme] .lesson .result{columns:2;column-gap:24px;padding:16px 18px 12px;margin-bottom:10px}
+[data-theme] .lesson .result > *{break-inside:avoid}
+[data-theme] .lesson .result > .note + .rrow{break-before:column}
+[data-theme] .lesson .result-hero{padding:0 0 8px}
+[data-theme] .lesson .result-hero b{font-size:46px}
+[data-theme] .lesson .rbar{margin:8px 0 8px}
+[data-theme] .lesson .rrow{padding:7px 0;font-size:12.5px}
+[data-theme] .lesson .result > .rrow:last-child{border-bottom:0}
+[data-theme] .lesson .handoff{margin:0;padding:11px 14px}
+
+/* ============================================================================
+   老师 tab（.tstage）：六个入口写在板上，对话条在板下半截
+   ========================================================================== */
+[data-theme] .tstage{grid-template-rows:auto minmax(0,1fr);padding-bottom:calc(var(--sb) + 22px)}
+[data-theme] .tstage::before,[data-theme] .tstage > :is(.dh-art,.dh-wrap){grid-row:1 / -1}
+[data-theme] .tstage::before{bottom:-12px}
+[data-theme] .tstage::after{grid-row:1 / -1;bottom:-21px}
+[data-theme="pop"] .tstage::after{bottom:-27px}
+[data-theme] .tstage .cls-top{position:relative;left:auto;right:auto;top:auto;grid-row:1;grid-column:1}
+[data-theme] .modes{position:relative;left:auto;top:auto;width:auto;grid-row:2;grid-column:1;align-self:start;
+  grid-template-columns:repeat(3,minmax(0,1fr));margin-top:12px}
+[data-theme] .mode{padding:8px 10px;gap:8px}
+[data-theme] .mode-i{width:26px;height:26px;border-radius:9px}
+[data-theme] .mode b{font-size:12px;line-height:1.3}
+#dock{left:calc(var(--sl) + var(--rail-w) + 22px);right:calc(var(--herw) + var(--sr) + 24px);bottom:calc(var(--sb) + 30px)}
+#dock .cap{margin:0 0 8px;padding:9px 14px}
+/* 聊开了以后，她那句开场白已经在对话记录里了；收掉它，记录才不会顶到板上第二排入口 */
+#dock:has(.chatthread:not([hidden])) .cap{display:none}
+/* 记录往上长，最多长到板上第二排入口下面（印尼语的入口字长、会折两行，按那个量过） */
+#dock .chatthread{max-height:calc(var(--stageh) - 296px)}
+
+/* ============================================================================
+   选老师：她站右边（和教室里一样），左边是介绍和缩略条
+   ========================================================================== */
+[data-theme] .pick{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 42%;height:var(--stageh)}
+[data-theme] .pick-hero{grid-column:2;grid-row:1;flex:none}
+[data-theme] .pick-hero img{object-position:50% 9%}
+[data-theme] .pick-hero::after{inset:0;height:auto;
+  background:linear-gradient(90deg,var(--bg) 0,rgba(245,243,250,0) 26%),
+             linear-gradient(0deg,var(--bg) 0,rgba(245,243,250,0) 30%)}
+[data-theme="pop"] .pick-hero::after{
+  background:linear-gradient(90deg,var(--bg) 0,rgba(var(--bgrgb),0) 26%),
+             linear-gradient(0deg,var(--bg) 0,rgba(var(--bgrgb),0) 30%)}
+[data-theme] .pick-kind{left:auto;right:calc(var(--sr) + 6px);top:16px}
+[data-theme] .pick-info{position:static;grid-column:1;grid-row:1;min-height:0;overflow-y:auto;scrollbar-width:none;
+  padding:22px 8px 18px calc(var(--sl) + 8px);display:flex;flex-direction:column}
+[data-theme] .pick-info::-webkit-scrollbar{display:none}
+[data-theme] .pick-intro{font-size:13.5px;margin-top:10px}
+[data-theme] .pick-strip{padding:12px 2px 6px;margin-top:auto}
+[data-theme] .pick-th{width:76px;height:96px;border-radius:15px}
+[data-theme] .pick-cta{position:absolute;right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 8px);z-index:3;
+  width:auto;min-width:132px;height:50px;padding:0 24px;margin:0}
+
+/* ============================================================================
+   课程（浅色卡片页）：两栏
+   注意 grid-auto-rows:max-content —— 等级卡和星星墙都带 overflow:hidden，
+   在一个本身定高、内容又超出的网格里，它们的「最小贡献」是 0，行会被压扁、后面的卡叠上来。
+   按内容高度定行高就没事。下面几处网格同理。
+   ========================================================================== */
+[data-theme] .screen:not(.flush){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:14px;
+  grid-auto-rows:max-content;align-content:start;align-items:start;
+  padding:16px calc(var(--sr) + 8px) 26px calc(var(--sl) + var(--rail-w) + 14px)}
+[data-theme] .screen:not(.flush) > *{grid-column:1 / -1}
+/* 第一排：等级卡 + 星星墙并排；等级卡下面接四个计量格，正好和星星墙一样高。
+   计量格在 DOM 里排在星章后面，用 order 把它提上来（order 也决定网格的自动排位顺序） */
+[data-theme] .screen:not(.flush) > :is(.top-row,.lvcard,.starwall,.meters){order:-1}
+[data-theme] .screen:not(.flush) > .lvcard{grid-column:1}
+[data-theme] .screen:not(.flush) > .starwall{grid-column:2;grid-row:span 2}
+[data-theme] .screen:not(.flush) > .meters{grid-column:1;margin-bottom:12px}
+[data-theme] .screen:not(.flush) > .unit{grid-column:auto;margin-bottom:0;margin-top:8px;text-align:left}
+[data-theme] .screen:not(.flush) > .top-row{margin-bottom:10px}
+/* 星章：六枚一行 */
+[data-theme] .screen:not(.flush) > .badges{grid-template-columns:repeat(6,minmax(0,1fr))}
+
+/* ============================================================================
+   课后剧场：左边是场景，右边是演出面板
+   ========================================================================== */
+[data-theme] .theater-phone{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);
+  grid-template-rows:auto auto minmax(0,1fr);column-gap:12px;height:var(--stageh);
+  padding:var(--st) calc(var(--sr) + 2px) var(--sb) var(--sl)}
+[data-theme] .theater-top{grid-row:1;grid-column:1;padding:12px 12px 6px;z-index:5}
+[data-theme] .theater-bars{grid-row:2;grid-column:1;padding:0 14px;z-index:5;position:relative}
+[data-theme] .theater-media{grid-row:1 / -1;grid-column:1;margin:0;min-height:0;flex:none;border-radius:22px}
+[data-theme] .theater-media .theater-tag,[data-theme] .theater-media .theater-time{top:auto;bottom:13px}
+[data-theme] .theater-media .theater-audio{top:auto;bottom:46px}
+[data-theme] .theater-caption{bottom:46px;right:58px}
+[data-theme] .theater-panel{grid-row:1 / -1;grid-column:2;margin:0;border-radius:22px;padding:14px 14px 0}
+/* 演出按钮钉在面板底部：选项一多，内容在它上面滚，按钮永远在拇指底下 */
+[data-theme] .theater-actions{order:2;flex-direction:row-reverse;justify-content:flex-start;padding:10px 0 12px;margin-top:0;
+  position:sticky;bottom:0;z-index:2;background:linear-gradient(180deg,rgba(var(--bgrgb,245,243,250),0),var(--bg) 14px)}
+[data-theme] .theater-act{flex:0 1 auto;min-height:46px;padding:8px 16px}
+[data-theme] .theater-act.wide{width:auto}
+/* 「不教新词」那行挪到按钮上面，按钮才能贴底 */
+[data-theme] .theater-foot{order:1;justify-content:flex-start;padding:10px 0 0;margin-top:auto}
+/* 谢幕：两栏，每块放在固定的格子里，整页不用滚就能看到「回到 Today」 */
+[data-theme] .theater-phone.recap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
+  grid-template-rows:auto auto auto auto auto;align-content:start;gap:8px 12px;overflow-y:auto;
+  padding:12px calc(var(--sr) + 6px) 14px calc(var(--sl) + 6px)}
+[data-theme] .theater-phone.recap .theater-top{grid-column:1 / -1;grid-row:1;padding:0}
+[data-theme] .theater-phone.recap > .theater-recap-hero{grid-column:1;grid-row:2 / span 2;padding:18px 18px}
+[data-theme] .theater-phone.recap .theater-recap-hero h2{font-size:21px;margin:6px 0 8px}
+[data-theme] .theater-phone.recap > .theater-recap-grid{grid-column:2;grid-row:2;margin-top:0}
+[data-theme] .theater-phone.recap > .theater-sentence{grid-column:2;grid-row:3;margin-top:0;padding:11px 14px}
+[data-theme] .theater-phone.recap .theater-sentence b{font-size:17px;margin:4px 0 1px}
+[data-theme] .theater-phone.recap > .theater-recap-title{grid-column:1;grid-row:4;margin:4px 2px 0}
+[data-theme] .theater-phone.recap > .theater-schedule{grid-column:1;grid-row:5}
+[data-theme] .theater-phone.recap > .theater-finish{grid-column:2;grid-row:5;justify-self:end;align-self:end;
+  width:auto;padding:0 24px;height:50px;margin:0}
+[data-theme] .theater-phone.recap > .theater-finish-note{grid-column:2;grid-row:4;align-self:end;text-align:right;margin:0}
+
+/* ============================================================================
+   弹层与提示
+   ========================================================================== */
+[data-theme] .sheet{justify-content:center}
+[data-theme] .sheet-c{max-width:560px;max-height:88%;padding:18px 20px 22px;display:flex;flex-direction:column}
+/* 弹层里的按钮也不铺满：右对齐的短键帽（剧场求助的「给我完整示范」、街区弹层的「关闭」） */
+[data-theme] .sheet-c > .btn,[data-theme] .sheet-c .street-sheet-close{width:auto;align-self:flex-end;padding:12px 22px}
+[data-theme] .toast{top:calc(var(--st) + 10px);bottom:auto;transform:translate(-50%,-10px);max-width:70%}
+[data-theme] .toast.on{transform:translate(-50%,0)}
+
+/* ============================================================================
+   矮屏与窄屏（铺满视图下的小手机：iPhone SE 横过来是 667×375，
+   Safari 带着地址栏时只剩 330px 上下）。字号和间距收一档，次要的说明行藏起来。
+   手机框是固定的 884×404，不会进这两段。
+   ========================================================================== */
+@media (max-height:390px){
+  html.bleed :is(.talk,.ask,.lesson,.stage,.tstage){padding-top:14px}
+  html.bleed :is(.talk,.ask,.lesson,.stage,.tstage)::before{top:-6px}
+  html.bleed :is(.talk-cap,.cap){margin-top:18px}
+  html.bleed :is(.thumb,.talk-ctl){margin-top:18px}
+  html.bleed .talk-say{font-size:14px;line-height:1.5}
+  html.bleed .talk-en{font-size:11px}
+  html.bleed .talk-cap,html.bleed .ask .cap{padding:8px 13px}
+  html.bleed .ask .cap p{font-size:13px}
+  html.bleed .stage-say{font-size:15px}
+  html.bleed .stage .chalk-h{font-size:21px}
+  html.bleed .ask-slate .chalk-h{font-size:19px}
+  html.bleed .ask-slate .chalk-k{margin-bottom:3px}
+  html.bleed .ask-slate .chalk-s{display:none}           /* 「选最主要的一个」这类提示行 */
+  /* 提示行一藏，第 1 问的选项就上移到她脸的高度，不能再往她身前伸 */
+  html.bleed .ask-body:has(> .opt:nth-of-type(6)){margin-right:calc(var(--herw) - 60px)}
+  html.bleed .ask-body .opt-d{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  html.bleed .ask-body .opt{padding:8px 10px}
+  html.bleed .chalk-words b{font-size:16px}
+  html.bleed .lesson .wcard-z{font-size:60px}
+  html.bleed .bd-w b{font-size:16px}
+  html.bleed .bd-z{font-size:26px}
+  html.bleed .bd-item b{font-size:21px}
+  html.bleed .lesson .lbody{padding-top:8px}
+  html.bleed .lesson .qopt{padding:9px 12px;margin-bottom:6px}
+  html.bleed .theater-actor p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  html.bleed .theater-action-copy h3{font-size:17px}
+  html.bleed .chk{padding:10px 13px;gap:6px}
+  html.bleed .chk-q{font-size:14px;margin-bottom:2px}
+  html.bleed .chk .qopt{padding:8px 10px;font-size:13px}
+  html.bleed .chk .fb{padding:9px 11px;font-size:12px}
+}
+@media (max-width:720px){
+  html.bleed .talk-ctl button{width:50px;height:50px;font-size:9px}
+  html.bleed :is(.thumb,.cls-act,.stage-act) .btn{min-width:96px;padding:0 15px;font-size:14px}
+}
+
+/* ============================================================================
+   去背全身像站在板前（7.1 的做法，按横屏重新定站位）
+   这一段放在文件最后：它要压过上面矮屏那段里第 1 问选项的宽度规则。
+   ----------------------------------------------------------------------------
+   7.1 的三条原则照搬：整张透明底立绘放进来，不裁、不羽化、不压暗调；全站一条站位线，
+   换屏时变的是板，她不动；整个人站在屏里，鞋踩在地上，脚下一团落影。
+   横屏要重算的是尺寸和位置：
+   · 身高 0.9 屏高（手机框里约 364px，比竖屏小一半——横屏只有 404px 高，要站全身只能这么大）；
+   · 不进网格：直接贴着屏的右下角定位（右边让出安全区 + 16px，鞋底离屏底 8px），
+     这样换屏时她纹丝不动；网格里她那一列只要容得下她——立绘宽 + 34px，比半身照那一列窄一半，
+     写字区反而变宽了；
+   · 字幕和右下角的按钮簇（z 6+）压在她小腿前面，7.1 的说法是「像站在讲台后面」。
+   林老师和杨老师各自带 cutGeo：林老师 617×2168（0.285），杨老师 633×2172（0.291）。
+   dhArt() 把当前老师的宽高比写到 --cut-ar / --cut-ar-w，她那一列和让位都按实际宽度算；
+   脸框只给检测器用，按 cutGeo.face 取。
+   ========================================================================== */
+.device{--cut-h:calc(var(--stageh) * .9);--cut-w:calc(var(--cut-h) * var(--cut-ar-w,.2846))}
+.dh-cut{position:absolute;z-index:3;pointer-events:none;
+  height:var(--cut-h);aspect-ratio:var(--cut-ar,617/2168);right:calc(var(--sr) + 16px);bottom:8px}
+/* 主光在左上（和板面左上角那片反光同一个方向），影子往右下落在板上；尺寸是竖屏的一半，影子也减半 */
+.dh-cut img{width:100%;height:100%;max-width:none;filter:drop-shadow(5px 7px 9px rgba(4,6,18,.42))}
+.dh-cut::before{content:"";position:absolute;z-index:-1;left:16%;width:62%;bottom:-1.8%;height:4%;
+  border-radius:50%;background:radial-gradient(closest-side,rgba(4,6,18,.55),rgba(4,6,18,0))}
+[data-theme="pop"] .dh-cut::before{background:radial-gradient(closest-side,rgba(var(--shw),.34),rgba(var(--shw),0))}
+/* 有她站着，就不要半身照的站位框；小头像（.dh-mini）永远用半身照 */
+.dh:not(.dh-mini):has(> .dh-cut) > :is(.dh-art,.room-shadow){display:none}
+.dh-mini > .dh-cut{display:none}
+/* 她那一列：立绘宽 + 34px（左边 28px 空、右边 6px）。按钮簇更宽时这一列照旧跟着变宽，她不动 */
+.device:has(#screens .dh:not(.dh-mini) > .dh-cut){--herw:calc(var(--cut-w) + 34px)}
+/* 面谈选项、判定屏的理由纸：一律停在她捏粉笔的那只手左边 12px，不压她 */
+html[data-theme] .ask:has(> .dh-cut) .ask-body{margin-right:calc(var(--cut-w) + 18px)}
+/* 「正在讲话」原来在右上角，正好是她头顶的位置：挪到她头的左边 */
+[data-theme] .dh:has(> .dh-cut) > .dh-state{right:calc(var(--sr) + 24px + var(--cut-w))}
+
+/* ============================================================================
+   课后情景对话 · 阿岚早餐铺
+   复用生活剧场的双栏骨架；这里只补三人对话、选择、跟读和完成页的专属层级。
+   ========================================================================== */
+[data-theme] .scenario-phone{grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)}
+[data-theme] .scenario-media > img{object-position:50% 56%}
+[data-theme] .scenario-media .theater-tag{max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-theme] .scenario-media .theater-say{font-size:20px;line-height:1.42}
+[data-theme] .scenario-media .theater-native{font-size:11.5px}
+[data-theme] .scenario-panel{padding-top:12px}
+[data-theme] .scenario-panel .theater-actor{padding:8px 10px;border-radius:14px}
+[data-theme] .scenario-panel .theater-actor p{margin-top:2px;line-height:1.42}
+[data-theme] .scenario-copy{padding-top:10px}
+[data-theme] .scenario-copy h3{font-size:18px;margin:4px 0 5px}
+[data-theme] .scenario-copy p{font-size:11px;line-height:1.52}
+[data-theme] .scenario-face{display:grid;place-items:center;flex:none;background:var(--violet-soft);
+  color:var(--violet-deep);border-radius:11px;font-size:14px;font-weight:900}
+[data-theme] .scenario-face.scenario-actor-face{width:32px;height:32px}
+[data-theme] .scenario-face.scenario-cast-face{width:24px;height:24px;border-radius:8px;font-size:10px}
+[data-theme] .scenario-actor img.scenario-actor-face{width:32px;height:32px;border-radius:11px}
+[data-theme] .scenario-cast{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+[data-theme] .scenario-cast-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;
+  border:1px solid var(--line);border-radius:999px;background:#fff;box-shadow:var(--soft-shadow);font-size:10px;font-weight:800}
+[data-theme] .scenario-cast-pill img.scenario-cast-face{width:24px;height:24px;border-radius:8px;object-fit:cover;object-position:50% 20%}
+[data-theme] .scenario-goal{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+[data-theme] .scenario-goal span{padding:5px 8px;border-radius:999px;background:var(--violet-soft);
+  color:var(--violet-deep);font-size:9.5px;font-weight:800;white-space:nowrap}
+[data-theme] .scenario-choice-list{gap:6px;margin-top:8px}
+[data-theme] .scenario-choice-list .theater-choice{padding:8px 10px;border-radius:13px}
+[data-theme] .scenario-choice-list .th-main b{font-size:14px;line-height:1.35}
+[data-theme] .scenario-choice-list .th-main small{font-size:9px;line-height:1.32;margin-top:1px}
+[data-theme] .scenario-choice-list .th-main em{font-size:9px;line-height:1.35;margin-top:1px}
+[data-theme] .scenario-feedback{padding:8px 10px;margin-top:7px;font-size:10px;line-height:1.45}
+[data-theme] .scenario-repeat-model{border:1px solid var(--line);border-radius:14px;background:#fff;
+  padding:10px 12px;margin-top:9px;box-shadow:var(--soft-shadow)}
+[data-theme] .scenario-repeat-model b{display:block;font-family:var(--song);font-size:20px;line-height:1.35;font-weight:500}
+[data-theme] .scenario-repeat-model small{display:block;margin-top:3px;color:var(--violet-deep);font-size:10px;font-weight:800}
+[data-theme] .scenario-repeat-model span{display:block;margin-top:2px;color:var(--muted);font-size:10px;line-height:1.4;font-weight:650}
+[data-theme] .scenario-mic-msg{margin:7px 0 0;border-radius:11px;background:var(--sun-soft);color:var(--coral-ink);
+  padding:8px 10px;font-size:10px;line-height:1.45;font-weight:700}
+[data-theme] .scenario-actions .theater-act{min-height:46px;padding:8px 14px}
+[data-theme] .scenario-actions .theater-act.primary{min-width:128px}
+[data-theme] .scenario-help-say{margin:10px 0 12px;padding:12px 14px;border-radius:14px;background:var(--violet-soft);
+  color:var(--violet-deep);font-family:var(--song);font-size:18px;line-height:1.45}
+[data-theme] .scenario-help-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+[data-theme] .scenario-help-actions .btn{width:auto;padding:10px 18px}
+[data-theme] .scenario-help-actions .tbtn{white-space:nowrap}
+[data-theme] .scenario-recap{display:grid;grid-template-columns:minmax(0,.98fr) minmax(0,1.02fr);
+  grid-template-rows:auto minmax(0,1fr) auto;align-content:stretch;gap:8px 12px;overflow:hidden;
+  padding:12px calc(var(--sr) + 6px) 12px calc(var(--sl) + 6px);background:var(--bg);color:var(--ink)}
+[data-theme] .scenario-recap .theater-top{grid-column:1 / -1;grid-row:1;padding:0}
+[data-theme] .scenario-recap .theater-progress-label{color:var(--ink)}
+[data-theme] .scenario-recap .theater-progress-sub{color:var(--muted)}
+[data-theme] .scenario-recap .theater-icon{background:#fff;color:var(--ink);border-color:var(--line);box-shadow:var(--soft-shadow)}
+[data-theme] .scene-done-mark{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
+  background:var(--sage);color:#fff;flex:none}
+[data-theme] .scene-done-mark svg{width:16px;height:16px}
+[data-theme] .scenario-recap-hero{grid-column:1;grid-row:2;min-height:0;border-radius:22px;padding:18px;
+  display:flex;flex-direction:column;justify-content:center;background:linear-gradient(135deg,var(--violet),var(--violet-deep));
+  color:#fff;box-shadow:0 16px 34px rgba(101,82,255,.26)}
+[data-theme] .scenario-recap-hero .eyebrow{color:rgba(255,255,255,.7);font-size:10px;font-weight:800;letter-spacing:.08em}
+[data-theme] .scenario-recap-hero h2{font-size:20px;line-height:1.3;margin:7px 0 8px;font-weight:900}
+[data-theme] .scenario-recap-hero p{font-size:11px;line-height:1.55;color:rgba(255,255,255,.8);margin:0;font-weight:650}
+[data-theme] .scenario-recap-phrases{grid-column:2;grid-row:2;display:grid;gap:6px;min-height:0}
+[data-theme] .scenario-phrase{min-height:0;background:#fff;border:1px solid var(--line);border-radius:14px;
+  padding:8px 11px;box-shadow:var(--soft-shadow);display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:baseline}
+[data-theme] .scenario-phrase b{grid-column:1;grid-row:1;font-size:9px;letter-spacing:.04em;color:var(--violet-deep);font-weight:850}
+[data-theme] .scenario-phrase strong{grid-column:2;grid-row:1;font-family:var(--song);font-size:16px;line-height:1.35;font-weight:500}
+[data-theme] .scenario-phrase small{grid-column:2;grid-row:2;font-size:9px;line-height:1.3;color:var(--violet-deep);font-weight:750}
+[data-theme] .scenario-phrase span{grid-column:2;grid-row:3;font-size:9.5px;line-height:1.35;color:var(--muted);font-weight:650}
+[data-theme] .scenario-recap-actions{grid-column:1 / -1;grid-row:3;display:flex;align-items:center;justify-content:flex-end;gap:8px}
+[data-theme] .scenario-recap-actions .theater-act{min-width:0;padding:8px 16px}
+[data-theme] .scenario-recap-actions .tbtn{padding:9px 12px;white-space:nowrap}
+@media (max-height:390px){
+  html.bleed .scenario-copy h3{font-size:16px}
+  html.bleed .scenario-copy p{line-height:1.42}
+  html.bleed .scenario-cast,.scenario-goal{margin-top:6px}
+  html.bleed .scenario-choice-list{gap:5px}
+  html.bleed .scenario-choice-list .theater-choice{padding:7px 9px}
+  html.bleed .scenario-choice-list .th-main em{display:none}
+  html.bleed .scenario-recap-hero{padding:13px}
+  html.bleed .scenario-recap-hero h2{font-size:17px}
+  html.bleed .scenario-recap-hero p{display:none}
+  html.bleed .scenario-phrase{padding:6px 9px}
+  html.bleed .scenario-phrase span{display:none}
+  html.bleed .scenario-recap-actions{gap:6px}
+}
+
+/* 情景页顶部进度在亮场景上要有自己的玻璃底，否则白字会消失在树影里 */
+[data-theme] .scenario-phone .theater-progress-head{padding:5px 12px;border-radius:999px;background:var(--glass);
+  border:1px solid var(--glass-line);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);max-width:calc(100% - 92px)}
+[data-theme] .scenario-phone .theater-progress-label{color:rgba(255,255,255,.9)}
+[data-theme] .scenario-phone .theater-progress-sub{color:rgba(255,255,255,.58)}
+/* 选择态压紧：三道选项必须在不滚动时全部看到，底部动作不盖住 C */
+[data-theme] .scenario-panel.choice-mode{padding-top:9px}
+[data-theme] .scenario-panel.choice-mode .theater-actor{display:none}
+[data-theme] .scenario-panel.choice-mode .scenario-copy{padding-top:6px}
+[data-theme] .scenario-panel.choice-mode .scenario-copy h3{font-size:16px;margin:2px 0 3px}
+[data-theme] .scenario-panel.choice-mode .scenario-copy p{font-size:10px;line-height:1.4}
+[data-theme] .scenario-panel.choice-mode .scenario-choice-list{margin-top:5px;gap:5px}
+[data-theme] .scenario-panel.choice-mode .scenario-choice-list .theater-choice{padding:6px 8px;border-radius:12px}
+[data-theme] .scenario-panel.choice-mode .scenario-choice-list .th-k{width:21px;height:21px;border-radius:7px}
+[data-theme] .scenario-panel.choice-mode .scenario-choice-list .th-main b{font-size:13px;line-height:1.28}
+[data-theme] .scenario-panel.choice-mode .scenario-choice-list .th-main small{font-size:8.5px;line-height:1.25;margin-top:1px}
+[data-theme] .scenario-panel.choice-mode .scenario-choice-list .th-main em{font-size:8.5px;line-height:1.25;margin-top:1px}
+[data-theme] .scenario-panel.choice-mode .theater-actions{padding-top:6px}
+[data-theme] .scenario-panel.choice-mode .theater-foot{display:none}
+[data-theme] .scenario-panel.repeat-mode .scenario-copy p{font-size:10px}
+
+/* 按住说话在触屏上不要顺手滚动面板 */
+[data-theme] #scenarioMic{touch-action:none;user-select:none;-webkit-user-select:none}

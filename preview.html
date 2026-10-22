@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>中文课 7.0 横屏 · 预览</title>
+<!--
+  给 DSH 右侧预览器用的一层壳。
+  为什么要有这个文件：预览器把 HTML 放进 sandbox="allow-scripts" 的 blob iframe 里，
+  只有相对路径的 .js / .css 会被它读进来换成 blob 地址，图片（assets/…）不会，
+  相对路径在 blob 下解析失败，老师立绘和场景图全是空白。
+  所以这里用一层 iframe 指向本机已经在跑的那个 http 服务（README 里那条 python3 -m http.server 8931），
+  预览器里看到的就是真正在跑的页面本身，图片、JS、主题切换都在。
+  直接双击这个文件没用（file:// 下也能跑，只是要靠浏览器允许跨源），要看就去访问 index.html。
+-->
+<style>
+  html,body{margin:0;height:100%;background:#efeef4;overflow:hidden}
+  iframe{border:0;display:block;width:100%;height:100%;background:#efeef4}
+</style>
+</head>
+<body>
+<iframe src="http://127.0.0.1:8931/ai-chinese-7-landscape/index.html"
+        title="中文课 7.0 横屏 · 黑板课堂原型"
+        allow="fullscreen"></iframe>
+</body>
+</html>
